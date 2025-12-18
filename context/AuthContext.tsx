@@ -27,25 +27,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user is logged in on mount
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem("token");
       if (token) {
         try {
           const res = await fetch(`${BACKEND_URL}/auth/me`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           });
           if (res.ok) {
             const data = await res.json();
-            setUser({
-              id: data.user.id,
-              firstName: data.user.firstName,
-              lastName: data.user.lastName,
-              email: data.user.email,
-            });
+            setUser(data.user);
           } else {
             localStorage.removeItem("token");
           }
@@ -72,16 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const data = await res.json();
     localStorage.setItem("token", data.token);
-    setUser({
-      id: data.user.id,
-      firstName: data.user.firstName,
-      lastName: data.user.lastName,
-      email: data.user.email,
-    });
+    setUser(data.user);
   };
 
   const register = async (firstName: string, lastName: string, email: string, password: string) => {
-    const res = await fetch(`${BACKEND_URL}/auth/register`, {
+    const res = await fetch(`${BACKEND_URL}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ firstName, lastName, email, password }),
@@ -92,14 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(error.message || "Registration failed");
     }
 
-    const data = await res.json();
-    localStorage.setItem("token", data.token);
-    setUser({
-      id: data.user.id,
-      firstName: data.user.firstName,
-      lastName: data.user.lastName,
-      email: data.user.email,
-    });
+    // No token — redirect to login handled in page
   };
 
   const logout = () => {
@@ -125,8 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 };

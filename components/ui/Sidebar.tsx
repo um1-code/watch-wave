@@ -3,6 +3,7 @@
 
 import { Home, Bookmark, Library, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 interface SidebarProps {
   currentView: "home" | "watchlist" | "library";
@@ -11,10 +12,11 @@ interface SidebarProps {
 
 export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const { logout } = useAuth();
+  const router = useRouter();
 
   const handleLogout = () => {
     logout();
-    window.location.href = "/login";
+    router.push("/login");
   };
 
   const menuItems = [
@@ -26,7 +28,7 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
   return (
     <div className="w-64 h-screen bg-black/90 backdrop-blur-xl border-r border-white/10 flex flex-col p-8">
       {/* Logo */}
-      <h1 className="text-3xl font-black text-red-600 mb-16 tracking-tighter italic">Watch-wave</h1>
+      <h1 className="text-3xl font-black text-red-600 mb-16 tracking-tighter italic">TAMO</h1>
 
       {/* Navigation */}
       <nav className="flex-1">

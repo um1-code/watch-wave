@@ -19,19 +19,25 @@ export default function LoginPage() {
     try {
       await login(email, password);
       router.push("/dashboard");
-    } catch (err) {
-      setError("Invalid email or password");
+    } catch (err: any) {
+      setError(err.message || "Login failed. Check your credentials.");
     }
   };
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center bg-[#141414]">
-      {/* Background and overlay same as before */}
+      <div
+        className="absolute inset-0 bg-cover bg-center hidden md:block opacity-40"
+        style={{
+          backgroundImage: "url('https://assets.nflxext.com/ffe/siteui/vlv3/f841d4c7-10e1-40af-9a10-07d3f044733e/web/US-en-20220502-popsignuptwoweeks-perspective_alpha_website_medium.jpg')",
+        }}
+      />
+      <div className="absolute inset-0 bg-black/60" />
       <div className="relative z-10 w-full max-w-[450px] bg-black/80 p-12 rounded-md text-white border border-white/5 shadow-2xl">
         <h1 className="text-3xl font-black mb-8 uppercase tracking-tighter italic text-[#E50914]">TAMO</h1>
         <h2 className="text-2xl font-bold mb-6">Sign In</h2>
 
-        {error && <p className="text-red-500 mb-4">{error}</p>}
+        {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <input
