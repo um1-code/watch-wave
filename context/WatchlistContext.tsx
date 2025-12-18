@@ -1,20 +1,20 @@
 // context/WatchlistContext.tsx
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 interface Movie {
   id: number;
   title?: string;
   name?: string;
-  poster_path: string;
-  backdrop_path?: string;
-  vote_average: number;
+  poster_path: string | null;
+  backdrop_path?: string | null;
   overview?: string;
-  personalNote?: string;
   release_date?: string;
   first_air_date?: string;
-  genre_ids?: number[];
+  vote_average?: number;
+  media_type?: "movie" | "tv";
+  personalNote?: string;
 }
 
 interface WatchlistContextType {
@@ -26,7 +26,7 @@ interface WatchlistContextType {
   updateNote: (movieId: number, note: string) => void;
   isInWatchlist: (id: number) => boolean;
   isWatched: (id: number) => boolean;
-  setToast: React.Dispatch<React.SetStateAction<{ msg: string; type: "success" | "info" } | null>>;
+  setToast: (toast: { msg: string; type: "success" | "info" } | null) => void;
 }
 
 const WatchlistContext = createContext<WatchlistContextType | undefined>(undefined);
@@ -36,16 +36,18 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const [watched, setWatched] = useState<Movie[]>([]);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "info" } | null>(null);
 
+  // Load from localStorage on mount
   useEffect(() => {
-    const savedWatch = localStorage.getItem("watchwave-watchlist");
-    const savedWatched = localStorage.getItem("watchwave-watched");
-    if (savedWatch) setWatchlist(JSON.parse(savedWatch));
+    const savedWatchlist = localStorage.getItem("tamo-watchlist");
+    const savedWatched = localStorage.getItem("tamo-watched");
+    if (savedWatchlist) setWatchlist(JSON.parse(savedWatchlist));
     if (savedWatched) setWatched(JSON.parse(savedWatched));
   }, []);
 
+  // Save to localStorage on change
   useEffect(() => {
-    localStorage.setItem("watchwave-watchlist", JSON.stringify(watchlist));
-    localStorage.setItem("watchwave-watched", JSON.stringify(watched));
+    localStorage.setItem("tamo-watchlist", JSON.stringify(watchlist));
+    localStorage.setItem("tamo-watched", JSON.stringify(watched));
   }, [watchlist, watched]);
 
   const showToast = (msg: string, type: "success" | "info" = "success") => {
@@ -56,19 +58,28 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const toggleWatchlist = (movie: Movie) => {
     setWatchlist((prev) => {
       const exists = prev.find((m) => m.id === movie.id);
-      showToast(exists ? "REMOVED FROM WATCHLIST" : "ADDED TO WATCHLIST", exists ? "info" : "success");
-      return exists ? prev.filter((m) => m.id !== movie.id) : [movie, ...prev];
+      if (exists) {
+        showToast("Removed from Watchlist", "info");
+        return prev.filter((m) => m.id !== movie.id);
+      } else {
+        showToast("Added to Watchlist!", "success");
+        return [movie, ...prev];
+      }
     });
   };
 
   const toggleWatched = (movie: Movie) => {
     setWatched((prev) => {
       const exists = prev.find((m) => m.id === movie.id);
-      showToast(exists ? "REMOVED FROM LIBRARY" : "MOVED TO LIBRARY", exists ? "info" : "success");
-      if (!exists) {
+      if (exists) {
+        showToast("Removed from Library", "info");
+        return prev.filter((m) => m.id !== movie.id);
+      } else {
+        showToast("Marked as Watched!", "success");
+        // Remove from watchlist if present
         setWatchlist((pw) => pw.filter((m) => m.id !== movie.id));
+        return [{ ...movie, personalNote: "" }, ...prev];
       }
-      return exists ? prev.filter((m) => m.id !== movie.id) : [{ ...movie, personalNote: "" }, ...prev];
     });
   };
 
@@ -76,26 +87,33 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     setWatched((prev) =>
       prev.map((m) => (m.id === movieId ? { ...m, personalNote: note } : m))
     );
-    showToast("NOTE SAVED", "success");
+    showToast("Note saved", "success");
   };
 
-  const value: WatchlistContextType = {
-    watchlist,
-    watched,
-    toast,
-    toggleWatchlist,
-    toggleWatched,
-    updateNote,
-    setToast,
-    isInWatchlist: (id: number) => watchlist.some((m) => m.id === id),
-    isWatched: (id: number) => watched.some((m) => m.id === id),
-  };
+  const isInWatchlist = (id: number) => watchlist.some((m) => m.id === id);
+  const isWatched = (id: number) => watched.some((m) => m.id === id);
 
-  return <WatchlistContext.Provider value={value}>{children}</WatchlistContext.Provider>;
+  return (
+    <WatchlistContext.Provider
+      value={{
+        watchlist,
+        watched,
+        toast,
+        toggleWatchlist,
+        toggleWatched,
+        updateNote,
+        isInWatchlist,
+        isWatched,
+        setToast,
+      }}
+    >
+      {children}
+    </WatchlistContext.Provider>
+  );
 }
 
 export const useWatchlist = () => {
   const context = useContext(WatchlistContext);
-  if (!context) throw new Error("useWatchlist must be used within a WatchlistProvider");
+  if (!context) throw new Error("useWatchlist must be used within WatchlistProvider");
   return context;
 };
