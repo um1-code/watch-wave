@@ -26,7 +26,7 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
   return (
     <div className="w-64 h-screen bg-black/90 backdrop-blur-xl border-r border-white/10 flex flex-col p-8">
       {/* Logo */}
-      <h1 className="text-3xl font-black text-red-600 mb-16 tracking-tighter italic">TAMO</h1>
+      <h1 className="text-3xl font-black text-red-600 mb-16 tracking-tighter italic">Watch-wave</h1>
 
       {/* Navigation */}
       <nav className="flex-1">

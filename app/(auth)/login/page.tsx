@@ -33,7 +33,7 @@ export default function LoginPage() {
       />
       <div className="absolute inset-0 bg-black/60" />
       <div className="relative z-10 w-full max-w-[450px] bg-black/80 p-12 rounded-md text-white border border-white/5 shadow-2xl">
-        <h1 className="text-3xl font-black mb-8 uppercase tracking-tighter italic text-[#E50914]">TAMO</h1>
+        <h1 className="text-3xl font-black mb-8 uppercase tracking-tighter italic text-[#E50914]">Watch-wave</h1>
         <h2 className="text-2xl font-bold mb-6">Sign In</h2>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -61,7 +61,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="mt-12 text-neutral-500 text-sm">
-          New to TAMO? <Link href="/register" className="text-white hover:underline font-bold">Sign up now.</Link>
+          New to Watch-wave? <Link href="/register" className="text-white hover:underline font-bold">Sign up now.</Link>
         </p>
       </div>
     </div>

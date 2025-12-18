@@ -4,7 +4,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { WatchlistProvider } from "@/context/WatchlistContext";
 
 export const metadata = {
-  title: "TAMO - Your Movie & TV Tracker",
+  title: "Watch-wave - Your Movie & TV Tracker",
   description: "Track what you want to watch and what you've seen",
 };
 
