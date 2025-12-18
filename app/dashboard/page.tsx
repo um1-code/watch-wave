@@ -14,12 +14,22 @@ const BACKEND_URL = "https://watch-wave-5es6.onrender.com";
 export default function DashboardPage() {
   const { toggleWatchlist, toast, setToast } = useWatchlist();
 
+  const [currentView, setCurrentView] = useState<"home" | "watchlist" | "library">("home");
+
   const [currentTab, setCurrentTab] = useState<"trending" | "top-rated" | "upcoming">("trending");
   const [movies, setMovies] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [selectedMovie, setSelectedMovie] = useState<any>(null);
+
+  // Filters
+  const [genres, setGenres] = useState<any[]>([{ id: 0, name: "All" }]);
+  const [selectedGenre, setSelectedGenre] = useState<string>("All");
+  const [selectedType, setSelectedType] = useState<"All" | "movie" | "tv">("All");
+  const [selectedYear, setSelectedYear] = useState<string>("All");
+  const [selectedSort, setSelectedSort] = useState<string>("popularity.desc");
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -30,63 +40,98 @@ export default function DashboardPage() {
     upcoming: "/api/tmdb/upcoming",
   };
 
+  // Fetch genres (fallback if backend doesn't have /genres)
+  useEffect(() => {
+    // You can add a backend endpoint for genres if needed
+    // For now, use a basic list
+    setGenres([
+      { id: 0, name: "All" },
+      { id: 28, name: "Action" },
+      { id: 12, name: "Adventure" },
+      { id: 16, name: "Animation" },
+      { id: 35, name: "Comedy" },
+      { id: 80, name: "Crime" },
+      { id: 18, name: "Drama" },
+      { id: 27, name: "Horror" },
+      { id: 878, name: "Sci-Fi" },
+      { id: 53, name: "Thriller" },
+    ]);
+  }, []);
+
   const fetchMovies = async (reset = false) => {
-    if (isLoading) return;
     setIsLoading(true);
+    let url = `${BACKEND_URL}${endpoints[currentTab]}?page=${reset ? 1 : page}`;
+
+    // Apply filters
+    if (selectedGenre !== "All") {
+      const genreId = genres.find(g => g.name === selectedGenre)?.id;
+      if (genreId && genreId !== 0) url += `&with_genres=${genreId}`;
+    }
+    if (selectedType !== "All") url += `&media_type=${selectedType}`;
+    if (selectedYear !== "All") url += `&year=${selectedYear}`;
+    if (selectedSort) url += `&sort_by=${selectedSort}`;
 
     try {
-      const res = await fetch(`${BACKEND_URL}${endpoints[currentTab]}?page=${reset ? 1 : page}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-
       const newMovies = data.results || [];
 
       if (reset) {
         setMovies(newMovies);
         setPage(2);
       } else {
-        setMovies((prev) => [...prev, ...newMovies]);
-        setPage((prev) => prev + 1);
+        setMovies(prev => [...prev, ...newMovies]);
+        setPage(prev => prev + 1);
       }
-
       setHasMore(data.page < data.total_pages);
     } catch (err) {
-      console.error("Fetch error:", err);
       setToast({ msg: "Failed to load movies", type: "info" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Load on tab change or initial mount
   useEffect(() => {
     fetchMovies(true);
-  }, [currentTab]);
+  }, [currentTab, selectedGenre, selectedType, selectedYear, selectedSort]);
 
-  // Search (placeholder - implement backend search if available)
+  // Search
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
       return;
     }
-    // You can add backend search later
-    setSearchResults([]);
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        // Replace with your backend search endpoint when ready
+        const res = await fetch(`${BACKEND_URL}/api/tmdb/search?query=${encodeURIComponent(searchQuery)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.results || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Add to watchlist via backend
+  // Add to watchlist
   const handleAddToWatchlist = async (movie: any) => {
     try {
       const res = await fetch(`${BACKEND_URL}/watchlist/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // if using sessions/cookies
         body: JSON.stringify({
           tmdb_id: movie.id,
           title: movie.title || movie.name,
           poster_path: movie.poster_path,
           overview: movie.overview,
           release_date: movie.release_date || movie.first_air_date,
-          media_type: movie.media_type || "movie",
         }),
       });
 
@@ -94,8 +139,7 @@ export default function DashboardPage() {
         toggleWatchlist(movie);
         setToast({ msg: "Added to Watchlist!", type: "success" });
       } else {
-        const error = await res.json();
-        setToast({ msg: error.message || "Already in watchlist", type: "info" });
+        setToast({ msg: "Already in watchlist or error", type: "info" });
       }
     } catch (err) {
       setToast({ msg: "Network error", type: "info" });
@@ -108,12 +152,13 @@ export default function DashboardPage() {
 
   return (
     <div className="grid grid-cols-[280px_1fr] h-screen bg-[#050505] text-white overflow-hidden">
-      <Sidebar currentView="home" onViewChange={() => {}} />
+      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
 
       <main className="overflow-y-auto">
-        {/* Top Nav: Tabs + Search */}
+        {/* Top Header */}
         <header className="sticky top-0 z-40 bg-[#050505]/95 backdrop-blur-xl border-b border-white/10 px-12 py-6">
           <div className="flex items-center justify-between">
+            {/* Tabs */}
             <div className="flex gap-12">
               {(["trending", "top-rated", "upcoming"] as const).map((tab) => (
                 <button
@@ -128,6 +173,7 @@ export default function DashboardPage() {
               ))}
             </div>
 
+            {/* Search */}
             <div className="relative w-96">
               {isSearching ? (
                 <Loader2 className="absolute left-4 top-1/2 -translate-y-1/2 animate-spin text-red-600" size={20} />
@@ -146,9 +192,67 @@ export default function DashboardPage() {
         </header>
 
         <div className="p-12">
+          {/* Filter Bar */}
+          <div className="bg-white/5 backdrop-blur-xl rounded-3xl p-8 mb-16 border border-white/10">
+            <h3 className="text-2xl font-black uppercase tracking-widest text-red-600 mb-8">Quick Filter</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+              <select
+                value={selectedGenre}
+                onChange={(e) => setSelectedGenre(e.target.value)}
+                className="bg-black/50 border border-white/20 rounded-xl px-6 py-4 text-white focus:border-red-600 outline-none uppercase tracking-wider"
+              >
+                {genres.map((g) => (
+                  <option key={g.id} value={g.name}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value as any)}
+                className="bg-black/50 border border-white/20 rounded-xl px-6 py-4 text-white focus:border-red-600 outline-none uppercase tracking-wider"
+              >
+                <option value="All">Type: All</option>
+                <option value="movie">Movie</option>
+                <option value="tv">TV Show</option>
+              </select>
+
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="bg-black/50 border border-white/20 rounded-xl px-6 py-4 text-white focus:border-red-600 outline-none uppercase tracking-wider"
+              >
+                <option value="All">Year: All</option>
+                {Array.from({ length: 50 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedSort}
+                onChange={(e) => setSelectedSort(e.target.value)}
+                className="bg-black/50 border border-white/20 rounded-xl px-6 py-4 text-white focus:border-red-600 outline-none uppercase tracking-wider"
+              >
+                <option value="popularity.desc">Popularity ↓</option>
+                <option value="vote_average.desc">Rating ↓</option>
+                <option value="primary_release_date.desc">Release Date ↓</option>
+              </select>
+            </div>
+
+            <button
+              onClick={() => fetchMovies(true)}
+              className="bg-red-600 hover:bg-red-700 text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-lg shadow-2xl transition"
+            >
+              Apply Filter
+            </button>
+          </div>
+
           <StatsDashboard />
 
-          {/* Hero - First movie bigger */}
+          {/* Hero */}
           {heroMovie && !searchQuery && (
             <div className="mb-20 relative rounded-3xl overflow-hidden h-[70vh]">
               <img
@@ -159,14 +263,9 @@ export default function DashboardPage() {
               <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
               <div className="relative z-10 h-full flex items-end p-16">
                 <div className="max-w-4xl">
-                  <div className="flex items-center gap-3 text-red-600 font-black uppercase tracking-widest text-sm mb-6">
-                    <Star size={20} fill="currentColor" />
-                    Featured
-                  </div>
                   <h1 className="text-7xl font-black uppercase leading-tight mb-8">
                     {heroMovie.title || heroMovie.name}
                   </h1>
-                  <p className="text-2xl text-white/80 mb-10 line-clamp-3 max-w-3xl">{heroMovie.overview}</p>
                   <button
                     onClick={() => setSelectedMovie(heroMovie)}
                     className="bg-red-600 hover:bg-red-700 text-white px-14 py-5 rounded-full font-black uppercase tracking-widest text-xl shadow-2xl transition"
@@ -178,7 +277,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Grid of remaining movies */}
+          {/* Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 mb-20">
             {gridMovies.map((movie) => (
               <MovieCard
@@ -189,7 +288,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* Next Page Button */}
+          {/* Next Page */}
           {!searchQuery && hasMore && (
             <div className="flex justify-end mb-12">
               <button
@@ -201,16 +300,10 @@ export default function DashboardPage() {
               </button>
             </div>
           )}
-
-          {isLoading && (
-            <div className="text-center py-12">
-              <Loader2 size={48} className="animate-spin text-red-600 mx-auto" />
-            </div>
-          )}
         </div>
       </main>
 
-      {/* Movie Details Modal */}
+      {/* Modal */}
       <AnimatePresence>
         {selectedMovie && (
           <motion.div
