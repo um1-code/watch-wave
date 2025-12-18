@@ -1,4 +1,4 @@
-export const isAuthenticated = () => true; // Replace with real auth logic
+export const isAuthenticated = () => false; 
 export const logout = () => {
   // Clear session
   localStorage.clear();

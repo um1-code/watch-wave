@@ -1,4 +1,3 @@
-// context/AuthContext.tsx
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
@@ -15,7 +14,12 @@ interface User {
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (firstName: string, lastName: string, email: string, password: string) => Promise<void>;
+  register: (
+    firstName: string,
+    lastName: string,
+    email: string,
+    password: string
+  ) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -27,29 +31,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ✅ CHECK AUTH USING TOKEN
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem("token");
-      if (token) {
-        try {
-          const res = await fetch(`${BACKEND_URL}/auth/login`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setUser(data.user);
-          } else {
-            localStorage.removeItem("token");
-          }
-        } catch (err) {
-          localStorage.removeItem("token");
-        }
+
+      if (!token) {
+        setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) throw new Error("Invalid token");
+
+        const data = await res.json();
+        setUser(data.user);
+      } catch {
+        localStorage.removeItem("token");
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
     };
+
     checkAuth();
   }, []);
 
+  // ✅ LOGIN
   const login = async (email: string, password: string) => {
     const res = await fetch(`${BACKEND_URL}/auth/login`, {
       method: "POST",
@@ -57,31 +71,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ email, password }),
     });
 
+    const data = await res.json();
+
     if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.message || "Login failed");
+      throw new Error(data.message || "Login failed");
     }
 
-    const data = await res.json();
     localStorage.setItem("token", data.token);
     setUser(data.user);
   };
 
-  const register = async (firstName: string, lastName: string, email: string, password: string) => {
+  // ✅ REGISTER
+  const register = async (
+    firstName: string,
+    lastName: string,
+    email: string,
+    password: string
+  ) => {
     const res = await fetch(`${BACKEND_URL}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ firstName, lastName, email, password }),
     });
 
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.message || "Registration failed");
-    }
+    const data = await res.json();
 
-    // No token — redirect to login handled in page
+    if (!res.ok) {
+      throw new Error(data.message || "Registration failed");
+    }
   };
 
+  // ✅ LOGOUT
   const logout = () => {
     localStorage.removeItem("token");
     setUser(null);
@@ -94,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
-        isAuthenticated: !!user,
+        isAuthenticated: Boolean(user),
         isLoading,
       }}
     >
@@ -105,6 +125,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  if (!context) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
   return context;
 };
