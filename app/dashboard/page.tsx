@@ -42,7 +42,7 @@ export default function DashboardPage() {
     upcoming: "/api/tmdb/upcoming",
   };
 
-  // Basic genres fallback
+  // Basic genres fallback (in case backend doesn't have /genres endpoint)
   useEffect(() => {
     setGenres([
       { id: 0, name: "All" },
