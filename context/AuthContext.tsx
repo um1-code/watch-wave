@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem("token");
       if (token) {
         try {
-          const res = await fetch(`${BACKEND_URL}/auth/login`, {
+          const res = await fetch(`${BACKEND_URL}/login`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (res.ok) {
