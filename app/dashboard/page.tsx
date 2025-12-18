@@ -1,324 +1,216 @@
 // app/dashboard/page.tsx
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import MovieRow from "@/components/ui/MovieRow";
 import MovieCard from "@/components/ui/MovieCard";
 import StatsDashboard from "@/components/ui/StatsDashboard";
 import Sidebar from "@/components/ui/Sidebar";
 import { useWatchlist } from "@/context/WatchlistContext";
-import { Search, Loader2, Flame, X, Star } from "lucide-react";
+import { Search, Loader2, X, Star } from "lucide-react";
 
-const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY || "97ca10f5cde769f2a4954342ecad7b02";
-const BASE_URL = "https://api.themoviedb.org/3";
+const BACKEND_URL = "https://watch-wave-5es6.onrender.com";
 
 export default function DashboardPage() {
-  const { watchlist, watched, toggleWatchlist, updateNote, isWatched, toast, setToast } = useWatchlist();
+  const { toggleWatchlist, toast, setToast } = useWatchlist();
 
-  const [currentView, setCurrentView] = useState<"home" | "watchlist" | "library">("home");
-  const [selectedMovie, setSelectedMovie] = useState<any>(null);
-
-  // Home view data
-  const [heroMovie, setHeroMovie] = useState<any>(null);
-  const [displayedMovies, setDisplayedMovies] = useState<any[]>([]);
+  const [currentTab, setCurrentTab] = useState<"trending" | "top-rated" | "upcoming">("trending");
+  const [movies, setMovies] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-
-  // Search
+  const [selectedMovie, setSelectedMovie] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Filters
-  const [genres, setGenres] = useState<any[]>([]);
-  const [selectedGenre, setSelectedGenre] = useState<string>("All");
-  const [selectedType, setSelectedType] = useState<"All" | "movie" | "tv">("All");
-  const [selectedYear, setSelectedYear] = useState<string>("All");
-  const [selectedSort, setSelectedSort] = useState<string>("popularity.desc");
+  const endpoints = {
+    trending: "/api/tmdb/trending",
+    "top-rated": "/api/tmdb/top-rated",
+    upcoming: "/api/tmdb/upcoming",
+  };
 
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-
-  // Fetch genres
-  useEffect(() => {
-    fetch(`${BASE_URL}/genre/movie/list?api_key=${API_KEY}`)
-      .then((res) => res.json())
-      .then((data) => setGenres([{ id: 0, name: "All" }, ...data.genres]));
-  }, []);
-
-  // Load initial data or apply filters
-  const loadMovies = async (reset = false) => {
+  const fetchMovies = async (reset = false) => {
     if (isLoading) return;
     setIsLoading(true);
 
-    let url = `${BASE_URL}/discover/${selectedType === "tv" ? "tv" : "movie"}?api_key=${API_KEY}&sort_by=${selectedSort}&page=${reset ? 1 : page}`;
-
-    if (selectedGenre !== "All") {
-      const genreId = genres.find((g) => g.name === selectedGenre)?.id;
-      if (genreId && genreId !== 0) url += `&with_genres=${genreId}`;
-    }
-
-    if (selectedYear !== "All") {
-      url += `&primary_release_year=${selectedYear}&first_air_date_year=${selectedYear}`;
-    }
-
     try {
-      const res = await fetch(url);
+      const res = await fetch(`${BACKEND_URL}${endpoints[currentTab]}?page=${reset ? 1 : page}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+
       const newMovies = data.results || [];
 
       if (reset) {
-        setDisplayedMovies(newMovies);
-        setHeroMovie(newMovies[0]);
+        setMovies(newMovies);
         setPage(2);
-        setHasMore(data.page < data.total_pages);
       } else {
-        setDisplayedMovies((prev) => [...prev, ...newMovies]);
+        setMovies((prev) => [...prev, ...newMovies]);
         setPage((prev) => prev + 1);
-        setHasMore(data.page < data.total_pages);
       }
+
+      setHasMore(data.page < data.total_pages);
     } catch (err) {
-      console.error("Load error:", err);
+      console.error("Fetch error:", err);
+      setToast({ msg: "Failed to load movies", type: "info" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Initial load & filter change
+  // Load on tab change or initial mount
   useEffect(() => {
-    loadMovies(true);
-  }, [selectedGenre, selectedType, selectedYear, selectedSort]);
+    fetchMovies(true);
+  }, [currentTab]);
 
-  // Infinite scroll observer
-  useEffect(() => {
-    if (!hasMore || currentView !== "home") return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !isLoading) {
-          loadMovies();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
-
-    return () => observer.disconnect();
-  }, [isLoading, hasMore, currentView]);
-
-  // Search
+  // Search (placeholder - implement backend search if available)
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
       return;
     }
-    const timer = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await fetch(`${BASE_URL}/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(searchQuery)}`);
-        const data = await res.json();
-        setSearchResults(data.results || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
+    // You can add backend search later
+    setSearchResults([]);
   }, [searchQuery]);
 
-  const renderContent = () => {
-    if (searchQuery) {
-      return (
-        <div className="p-12">
-          <h2 className="text-3xl font-black uppercase mb-8 text-white/80">Search Results</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
-            {searchResults.map((movie) => (
-              <MovieCard key={movie.id} movie={movie} onClick={() => setSelectedMovie(movie)} />
-            ))}
-          </div>
-        </div>
-      );
+  // Add to watchlist via backend
+  const handleAddToWatchlist = async (movie: any) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/watchlist/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // if using sessions/cookies
+        body: JSON.stringify({
+          tmdb_id: movie.id,
+          title: movie.title || movie.name,
+          poster_path: movie.poster_path,
+          overview: movie.overview,
+          release_date: movie.release_date || movie.first_air_date,
+          media_type: movie.media_type || "movie",
+        }),
+      });
+
+      if (res.ok) {
+        toggleWatchlist(movie);
+        setToast({ msg: "Added to Watchlist!", type: "success" });
+      } else {
+        const error = await res.json();
+        setToast({ msg: error.message || "Already in watchlist", type: "info" });
+      }
+    } catch (err) {
+      setToast({ msg: "Network error", type: "info" });
     }
-
-    if (currentView === "watchlist") {
-      return (
-        <div className="p-12">
-          <h1 className="text-5xl font-black uppercase mb-12 text-red-600 tracking-tighter">My Watchlist</h1>
-          {watchlist.length === 0 ? (
-            <p className="text-center text-white/50 text-2xl mt-20">Your watchlist is empty</p>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
-              {watchlist.map((movie) => (
-                <MovieCard key={movie.id} movie={movie} onClick={() => setSelectedMovie(movie)} />
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (currentView === "library") {
-      return (
-        <div className="p-12">
-          <h1 className="text-5xl font-black uppercase mb-12 text-red-600 tracking-tighter">My Library</h1>
-          <StatsDashboard />
-          {watched.length === 0 ? (
-            <p className="text-center text-white/50 text-2xl mt-20">You haven't watched anything yet</p>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
-              {watched.map((movie) => (
-                <MovieCard key={movie.id} movie={movie} onClick={() => setSelectedMovie(movie)} />
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // Home view with filters & infinite scroll
-    return (
-      <div className="p-8 pb-32">
-        {/* Filter Bar */}
-        <div className="bg-white/5 backdrop-blur-xl rounded-3xl p-8 mb-16 border border-white/10">
-          <h3 className="text-2xl font-black uppercase tracking-widest text-red-600 mb-8">Quick Filter</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-            <select
-              value={selectedGenre}
-              onChange={(e) => setSelectedGenre(e.target.value)}
-              className="bg-black/50 border border-white/20 rounded-xl px-6 py-4 text-white focus:border-red-600 outline-none uppercase tracking-wider"
-            >
-              {genres.map((g) => (
-                <option key={g.id} value={g.name}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value as any)}
-              className="bg-black/50 border border-white/20 rounded-xl px-6 py-4 text-white focus:border-red-600 outline-none uppercase tracking-wider"
-            >
-              <option value="All">Type: All</option>
-              <option value="movie">Movie</option>
-              <option value="tv">TV Show</option>
-            </select>
-
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="bg-black/50 border border-white/20 rounded-xl px-6 py-4 text-white focus:border-red-600 outline-none uppercase tracking-wider"
-            >
-              <option value="All">Year: All</option>
-              {Array.from({ length: new Date().getFullYear() - 1980 + 1 }, (_, i) => new Date().getFullYear() - i).map((y) => (
-                <option key={y} value={y.toString()}>
-                  {y}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={selectedSort}
-              onChange={(e) => setSelectedSort(e.target.value)}
-              className="bg-black/50 border border-white/20 rounded-xl px-6 py-4 text-white focus:border-red-600 outline-none uppercase tracking-wider"
-            >
-              <option value="popularity.desc">Popularity ↓</option>
-              <option value="vote_average.desc">Rating ↓</option>
-              <option value="primary_release_date.desc">Release Date ↓</option>
-            </select>
-          </div>
-
-          <button
-            onClick={() => loadMovies(true)}
-            disabled={isLoading}
-            className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-lg shadow-2xl transition"
-          >
-            {isLoading ? "Applying..." : "Apply Filter"}
-          </button>
-        </div>
-
-        {/* Hero */}
-        {heroMovie && (
-          <div className="relative h-[80vh] mb-20 rounded-3xl overflow-hidden">
-            <img
-              src={`https://image.tmdb.org/t/p/original${heroMovie.backdrop_path}`}
-              alt=""
-              className="absolute inset-0 w-full h-full object-cover brightness-50"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
-            <div className="relative z-10 h-full flex items-end p-16">
-              <div className="max-w-3xl">
-                <div className="flex items-center gap-3 text-red-600 font-black uppercase tracking-widest text-sm mb-6">
-                  <Flame size={20} fill="currentColor" />
-                  Featured Today
-                </div>
-                <h1 className="text-7xl font-black uppercase leading-tight mb-8">
-                  {heroMovie.title || heroMovie.name}
-                </h1>
-                <button
-                  onClick={() => setSelectedMovie(heroMovie)}
-                  className="bg-white text-black px-12 py-5 rounded-full font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition shadow-2xl"
-                >
-                  View Details
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <StatsDashboard />
-
-        {/* All movies in one big grid with infinite scroll */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
-          {displayedMovies.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} onClick={() => setSelectedMovie(movie)} />
-          ))}
-        </div>
-
-        {/* Loading Spinner & Infinite Scroll Trigger */}
-        {isLoading && (
-          <div className="text-center py-16">
-            <Loader2 size={48} className="animate-spin text-red-600 mx-auto" />
-            <p className="text-white/60 mt-4 uppercase tracking-wider text-lg">Loading more...</p>
-          </div>
-        )}
-
-        {!isLoading && hasMore && <div ref={loadMoreRef} className="h-20" />}
-      </div>
-    );
   };
+
+  const displayMovies = searchQuery ? searchResults : movies;
+  const heroMovie = displayMovies[0];
+  const gridMovies = displayMovies.slice(1);
 
   return (
     <div className="grid grid-cols-[280px_1fr] h-screen bg-[#050505] text-white overflow-hidden">
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+      <Sidebar currentView="home" onViewChange={() => {}} />
 
       <main className="overflow-y-auto">
+        {/* Top Nav: Tabs + Search */}
         <header className="sticky top-0 z-40 bg-[#050505]/95 backdrop-blur-xl border-b border-white/10 px-12 py-6">
-          <div className="max-w-2xl ml-auto">
-            <div className="relative">
+          <div className="flex items-center justify-between">
+            <div className="flex gap-12">
+              {(["trending", "top-rated", "upcoming"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setCurrentTab(tab)}
+                  className={`text-xl font-black uppercase tracking-widest transition ${
+                    currentTab === tab ? "text-red-600" : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  {tab.replace("-", " ")}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative w-96">
               {isSearching ? (
-                <Loader2 className="absolute left-4 top-1/2 -translate-y-1/2 animate-spin text-red-600" size={22} />
+                <Loader2 className="absolute left-4 top-1/2 -translate-y-1/2 animate-spin text-red-600" size={20} />
               ) : (
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={22} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={20} />
               )}
               <input
                 type="text"
                 placeholder="Search movies & shows..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/10 border border-white/20 rounded-full pl-14 pr-8 py-5 text-white placeholder-white/40 focus:outline-none focus:border-red-600 transition text-lg"
+                className="w-full bg-white/10 border border-white/20 rounded-full pl-12 pr-6 py-4 text-white placeholder-white/40 focus:outline-none focus:border-red-600 transition"
               />
             </div>
           </div>
         </header>
 
-        {renderContent()}
+        <div className="p-12">
+          <StatsDashboard />
+
+          {/* Hero - First movie bigger */}
+          {heroMovie && !searchQuery && (
+            <div className="mb-20 relative rounded-3xl overflow-hidden h-[70vh]">
+              <img
+                src={`https://image.tmdb.org/t/p/original${heroMovie.backdrop_path || heroMovie.poster_path}`}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover brightness-50"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
+              <div className="relative z-10 h-full flex items-end p-16">
+                <div className="max-w-4xl">
+                  <div className="flex items-center gap-3 text-red-600 font-black uppercase tracking-widest text-sm mb-6">
+                    <Star size={20} fill="currentColor" />
+                    Featured
+                  </div>
+                  <h1 className="text-7xl font-black uppercase leading-tight mb-8">
+                    {heroMovie.title || heroMovie.name}
+                  </h1>
+                  <p className="text-2xl text-white/80 mb-10 line-clamp-3 max-w-3xl">{heroMovie.overview}</p>
+                  <button
+                    onClick={() => setSelectedMovie(heroMovie)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-14 py-5 rounded-full font-black uppercase tracking-widest text-xl shadow-2xl transition"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Grid of remaining movies */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 mb-20">
+            {gridMovies.map((movie) => (
+              <MovieCard
+                key={movie.id}
+                movie={movie}
+                onClick={() => setSelectedMovie(movie)}
+              />
+            ))}
+          </div>
+
+          {/* Next Page Button */}
+          {!searchQuery && hasMore && (
+            <div className="flex justify-end mb-12">
+              <button
+                onClick={() => fetchMovies(false)}
+                disabled={isLoading}
+                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-lg shadow-2xl transition"
+              >
+                {isLoading ? "Loading..." : "Next Page"}
+              </button>
+            </div>
+          )}
+
+          {isLoading && (
+            <div className="text-center py-12">
+              <Loader2 size={48} className="animate-spin text-red-600 mx-auto" />
+            </div>
+          )}
+        </div>
       </main>
 
-      {/* Modal */}
+      {/* Movie Details Modal */}
       <AnimatePresence>
         {selectedMovie && (
           <motion.div
@@ -363,27 +255,12 @@ export default function DashboardPage() {
                     "{selectedMovie.overview}"
                   </p>
 
-                  {isWatched(selectedMovie.id) ? (
-                    <div className="space-y-4">
-                      <label className="text-red-600 font-black uppercase tracking-wider text-xl">Your Notes</label>
-                      <textarea
-                        className="w-full h-64 bg-white/5 border border-white/20 rounded-xl p-6 text-white resize-none focus:border-red-600 outline-none text-base leading-relaxed"
-                        placeholder="Write your personal thoughts..."
-                        value={watched.find((m) => m.id === selectedMovie.id)?.personalNote ?? ""}
-                        onChange={(e) => updateNote(selectedMovie.id, e.target.value)}
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        toggleWatchlist(selectedMovie);
-                        setSelectedMovie(null);
-                      }}
-                      className="bg-red-600 hover:bg-red-700 text-white px-14 py-6 rounded-full font-black uppercase tracking-widest text-xl shadow-2xl shadow-red-600/40 transition"
-                    >
-                      Add to Watchlist
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleAddToWatchlist(selectedMovie)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-14 py-6 rounded-full font-black uppercase tracking-widest text-xl shadow-2xl shadow-red-600/40 transition"
+                  >
+                    Add to Watchlist
+                  </button>
                 </div>
               </div>
             </motion.div>
