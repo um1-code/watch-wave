@@ -7,12 +7,12 @@ import StatsDashboard from "@/components/ui/StatsDashboard";
 import Sidebar from "@/components/ui/Sidebar";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { useAuth } from "@/context/AuthContext";
-import { X, Star } from "lucide-react";
+import { X, Star, Check, Plus } from "lucide-react";
 
 const BACKEND_URL = "https://watch-wave-5es6.onrender.com";
 
 export default function DashboardPage() {
-  const { toggleWatchlist, toast, setToast } = useWatchlist();
+  const { toggleWatchlist, toast, setToast, watchlist } = useWatchlist();
   const { user } = useAuth();
 
   const [currentView, setCurrentView] = useState<"home" | "search" | "watchlist" | "library">("home");
@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [selectedMovie, setSelectedMovie] = useState<any>(null);
+  const [isAddingToWatchlist, setIsAddingToWatchlist] = useState(false);
 
   // Filters
   const [genres, setGenres] = useState<any[]>([{ id: 0, name: "All" }]);
@@ -90,8 +91,17 @@ export default function DashboardPage() {
     fetchMovies(true);
   }, [currentTab, selectedGenre, selectedType, selectedYear, selectedSort]);
 
+  // Check if movie is in watchlist
+  const isInWatchlist = (movieId: number) => {
+    return watchlist?.some((item: any) => item.tmdb_id === movieId || item.id === movieId);
+  };
+
   // Add to watchlist
   const handleAddToWatchlist = async (movie: any) => {
+    if (isAddingToWatchlist) return;
+    
+    setIsAddingToWatchlist(true);
+    
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${BACKEND_URL}/watchlist/create`, {
@@ -109,14 +119,23 @@ export default function DashboardPage() {
         }),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
         toggleWatchlist(movie);
         setToast({ msg: "Added to Watchlist!", type: "success" });
       } else {
-        setToast({ msg: "Already in watchlist or error", type: "info" });
+        if (data.message?.includes("already exists")) {
+          setToast({ msg: "Already in watchlist", type: "info" });
+        } else {
+          setToast({ msg: data.message || "Failed to add", type: "info" });
+        }
       }
     } catch (err) {
+      console.error("Watchlist error:", err);
       setToast({ msg: "Network error", type: "info" });
+    } finally {
+      setIsAddingToWatchlist(false);
     }
   };
 
@@ -218,7 +237,7 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          <StatsDashboard />
+          {/* <StatsDashboard /> */}
 
           {/* Hero */}
           {heroMovie && (
@@ -318,9 +337,29 @@ export default function DashboardPage() {
 
                   <button
                     onClick={() => handleAddToWatchlist(selectedMovie)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-14 py-6 rounded-full font-black uppercase tracking-widest text-xl shadow-2xl shadow-red-600/40 transition"
+                    disabled={isAddingToWatchlist || isInWatchlist(selectedMovie.id)}
+                    className={`flex items-center justify-center gap-4 px-14 py-6 rounded-full font-black uppercase tracking-widest text-xl shadow-2xl transition ${
+                      isInWatchlist(selectedMovie.id)
+                        ? "bg-green-600 hover:bg-green-700 shadow-green-600/40"
+                        : "bg-red-600 hover:bg-red-700 shadow-red-600/40"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    Add to Watchlist
+                    {isAddingToWatchlist ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Adding...
+                      </>
+                    ) : isInWatchlist(selectedMovie.id) ? (
+                      <>
+                        <Check size={24} strokeWidth={3} />
+                        In Watchlist
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={24} strokeWidth={3} />
+                        Add to Watchlist
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

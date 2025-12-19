@@ -1,9 +1,9 @@
 // components/ui/Sidebar.tsx
 "use client";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Home, Search, Bookmark, Library, LogOut } from "lucide-react";
+import { useState } from "react";
 
 interface SidebarProps {
   currentView: "home" | "search" | "watchlist" | "library";
@@ -12,6 +12,8 @@ interface SidebarProps {
 
 export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const menuItems = [
     { id: "home", label: "Dashboard", icon: Home, href: "/dashboard" },
@@ -19,6 +21,40 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
     { id: "watchlist", label: "Watchlist", icon: Bookmark, href: "/watchlist" },
     { id: "library", label: "Library", icon: Library, href: "/library" },
   ];
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    
+    try {
+      // Option 1: If using NextAuth
+      // await signOut({ redirect: false });
+      
+      // Option 2: If using your own auth API
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Logout failed');
+      }
+
+      // Clear any client-side storage
+      localStorage.removeItem('authToken');
+      sessionStorage.clear();
+      
+      // Redirect to login
+      router.push('/login');
+      router.refresh(); // Refresh to clear any cached data
+      
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still redirect even if API fails
+      router.push('/login');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <aside className="bg-black/40 backdrop-blur-xl border-r border-white/10 flex flex-col">
@@ -57,9 +93,13 @@ export default function Sidebar({ currentView, onViewChange }: SidebarProps) {
 
       {/* Logout */}
       <div className="p-6 border-t border-white/10">
-        <button className="flex items-center gap-4 px-6 py-4 rounded-2xl font-black uppercase tracking-wider text-sm text-white/60 hover:text-white hover:bg-white/5 w-full transition">
+        <button 
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className="flex items-center gap-4 px-6 py-4 rounded-2xl font-black uppercase tracking-wider text-sm text-white/60 hover:text-white hover:bg-white/5 w-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <LogOut size={22} strokeWidth={2.5} />
-          Logout
+          {isLoggingOut ? 'Logging out...' : 'Logout'}
         </button>
       </div>
     </aside>
