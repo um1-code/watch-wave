@@ -1,32 +1,32 @@
-// context/WatchlistContext.tsx
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 interface Movie {
   id: number;
   title?: string;
   name?: string;
-  poster_path: string | null;
-  backdrop_path?: string | null;
-  overview?: string;
-  release_date?: string;
-  first_air_date?: string;
+  poster_path?: string;
   vote_average?: number;
-  media_type?: "movie" | "tv";
   personalNote?: string;
 }
 
 interface WatchlistContextType {
   watchlist: Movie[];
   watched: Movie[];
-  toast: { msg: string; type: "success" | "info" } | null;
+
   toggleWatchlist: (movie: Movie) => void;
   toggleWatched: (movie: Movie) => void;
-  updateNote: (movieId: number, note: string) => void;
+
   isInWatchlist: (id: number) => boolean;
   isWatched: (id: number) => boolean;
-  setToast: (toast: { msg: string; type: "success" | "info" } | null) => void;
+
+  updateNote: (id: number, note: string) => void;
+
+  toast: { msg: string; type: "success" | "info" } | null;
+  setToast: React.Dispatch<
+    React.SetStateAction<{ msg: string; type: "success" | "info" } | null>
+  >;
 }
 
 const WatchlistContext = createContext<WatchlistContextType | undefined>(undefined);
@@ -34,76 +34,76 @@ const WatchlistContext = createContext<WatchlistContextType | undefined>(undefin
 export function WatchlistProvider({ children }: { children: ReactNode }) {
   const [watchlist, setWatchlist] = useState<Movie[]>([]);
   const [watched, setWatched] = useState<Movie[]>([]);
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "info" } | null>(null);
+  const [toast, setToast] = useState<WatchlistContextType["toast"]>(null);
 
-  // Load from localStorage on mount
+  /* ---------------- LOAD FROM STORAGE ---------------- */
   useEffect(() => {
-    const savedWatchlist = localStorage.getItem("tamo-watchlist");
-    const savedWatched = localStorage.getItem("tamo-watched");
-    if (savedWatchlist) setWatchlist(JSON.parse(savedWatchlist));
-    if (savedWatched) setWatched(JSON.parse(savedWatched));
+    const wl = localStorage.getItem("watchlist");
+    const wd = localStorage.getItem("watched");
+    if (wl) setWatchlist(JSON.parse(wl));
+    if (wd) setWatched(JSON.parse(wd));
   }, []);
 
-  // Save to localStorage on change
+  /* ---------------- SAVE TO STORAGE ---------------- */
   useEffect(() => {
-    localStorage.setItem("tamo-watchlist", JSON.stringify(watchlist));
-    localStorage.setItem("tamo-watched", JSON.stringify(watched));
-  }, [watchlist, watched]);
+    localStorage.setItem("watchlist", JSON.stringify(watchlist));
+  }, [watchlist]);
 
-  const showToast = (msg: string, type: "success" | "info" = "success") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  };
+  useEffect(() => {
+    localStorage.setItem("watched", JSON.stringify(watched));
+  }, [watched]);
 
+  /* ---------------- HELPERS ---------------- */
+  const isInWatchlist = (id: number) =>
+    watchlist.some((movie) => movie.id === id);
+
+  const isWatched = (id: number) =>
+    watched.some((movie) => movie.id === id);
+
+  /* ---------------- ACTIONS ---------------- */
   const toggleWatchlist = (movie: Movie) => {
-    setWatchlist((prev) => {
-      const exists = prev.find((m) => m.id === movie.id);
-      if (exists) {
-        showToast("Removed from Watchlist", "info");
-        return prev.filter((m) => m.id !== movie.id);
-      } else {
-        showToast("Added to Watchlist!", "success");
-        return [movie, ...prev];
-      }
+    setWatchlist((prev) =>
+      isInWatchlist(movie.id)
+        ? prev.filter((m) => m.id !== movie.id)
+        : [...prev, movie]
+    );
+
+    setToast({
+      msg: isInWatchlist(movie.id)
+        ? "Removed from Watchlist"
+        : "Added to Watchlist",
+      type: "success",
     });
   };
 
   const toggleWatched = (movie: Movie) => {
-    setWatched((prev) => {
-      const exists = prev.find((m) => m.id === movie.id);
-      if (exists) {
-        showToast("Removed from Library", "info");
-        return prev.filter((m) => m.id !== movie.id);
-      } else {
-        showToast("Marked as Watched!", "success");
-        // Remove from watchlist if present
-        setWatchlist((pw) => pw.filter((m) => m.id !== movie.id));
-        return [{ ...movie, personalNote: "" }, ...prev];
-      }
-    });
+    if (isWatched(movie.id)) {
+      setWatched((prev) => prev.filter((m) => m.id !== movie.id));
+      setToast({ msg: "Removed from Library", type: "info" });
+    } else {
+      setWatched((prev) => [...prev, { ...movie, personalNote: "" }]);
+      setWatchlist((prev) => prev.filter((m) => m.id !== movie.id));
+      setToast({ msg: "Marked as Watched", type: "success" });
+    }
   };
 
-  const updateNote = (movieId: number, note: string) => {
+  const updateNote = (id: number, note: string) => {
     setWatched((prev) =>
-      prev.map((m) => (m.id === movieId ? { ...m, personalNote: note } : m))
+      prev.map((m) => (m.id === id ? { ...m, personalNote: note } : m))
     );
-    showToast("Note saved", "success");
   };
-
-  const isInWatchlist = (id: number) => watchlist.some((m) => m.id === id);
-  const isWatched = (id: number) => watched.some((m) => m.id === id);
 
   return (
     <WatchlistContext.Provider
       value={{
         watchlist,
         watched,
-        toast,
         toggleWatchlist,
         toggleWatched,
-        updateNote,
         isInWatchlist,
         isWatched,
+        updateNote,
+        toast,
         setToast,
       }}
     >
@@ -113,7 +113,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
 }
 
 export const useWatchlist = () => {
-  const context = useContext(WatchlistContext);
-  if (!context) throw new Error("useWatchlist must be used within WatchlistProvider");
-  return context;
+  const ctx = useContext(WatchlistContext);
+  if (!ctx) throw new Error("useWatchlist must be used within WatchlistProvider");
+  return ctx;
 };

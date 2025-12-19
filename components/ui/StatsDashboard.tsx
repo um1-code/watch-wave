@@ -1,4 +1,3 @@
-// components/ui/StatsDashboard.tsx
 "use client";
 
 import { useWatchlist } from "@/context/WatchlistContext";

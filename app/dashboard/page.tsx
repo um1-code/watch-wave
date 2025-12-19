@@ -1,4 +1,3 @@
-// app/dashboard/page.tsx - FULL FINAL CODE
 "use client";
 
 import { useEffect, useState } from "react";
@@ -8,7 +7,7 @@ import StatsDashboard from "@/components/ui/StatsDashboard";
 import Sidebar from "@/components/ui/Sidebar";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { useAuth } from "@/context/AuthContext";
-import { Search, Loader2, X, Star } from "lucide-react";
+import { X, Star } from "lucide-react";
 
 const BACKEND_URL = "https://watch-wave-5es6.onrender.com";
 
@@ -16,7 +15,7 @@ export default function DashboardPage() {
   const { toggleWatchlist, toast, setToast } = useWatchlist();
   const { user } = useAuth();
 
-  const [currentView, setCurrentView] = useState<"home" | "watchlist" | "library">("home");
+  const [currentView, setCurrentView] = useState<"home" | "search" | "watchlist" | "library">("home");
 
   const [currentTab, setCurrentTab] = useState<"trending" | "top-rated" | "upcoming">("trending");
   const [movies, setMovies] = useState<any[]>([]);
@@ -31,10 +30,6 @@ export default function DashboardPage() {
   const [selectedType, setSelectedType] = useState<"All" | "movie" | "tv">("All");
   const [selectedYear, setSelectedYear] = useState<string>("All");
   const [selectedSort, setSelectedSort] = useState<string>("popularity.desc");
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
 
   const endpoints = {
     trending: "/api/tmdb/trending",
@@ -95,29 +90,6 @@ export default function DashboardPage() {
     fetchMovies(true);
   }, [currentTab, selectedGenre, selectedType, selectedYear, selectedSort]);
 
-  // Search
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/tmdb/search?query=${encodeURIComponent(searchQuery)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setSearchResults(data.results || []);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
   // Add to watchlist
   const handleAddToWatchlist = async (movie: any) => {
     try {
@@ -148,7 +120,7 @@ export default function DashboardPage() {
     }
   };
 
-  const displayMovies = searchQuery ? searchResults : movies;
+  const displayMovies = movies;
   const heroMovie = displayMovies[0];
   const gridMovies = displayMovies.slice(1);
 
@@ -173,22 +145,6 @@ export default function DashboardPage() {
                   {tab.replace("-", " ")}
                 </button>
               ))}
-            </div>
-
-            {/* Search */}
-            <div className="relative w-96">
-              {isSearching ? (
-                <Loader2 className="absolute left-4 top-1/2 -translate-y-1/2 animate-spin text-red-600" size={20} />
-              ) : (
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={20} />
-              )}
-              <input
-                type="text"
-                placeholder="Search movies & shows..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/10 border border-white/20 rounded-full pl-12 pr-6 py-4 text-white placeholder-white/40 focus:outline-none focus:border-red-600 transition"
-              />
             </div>
           </div>
         </header>
@@ -265,7 +221,7 @@ export default function DashboardPage() {
           <StatsDashboard />
 
           {/* Hero */}
-          {heroMovie && !searchQuery && (
+          {heroMovie && (
             <div className="mb-20 relative rounded-3xl overflow-hidden h-[70vh]">
               <img
                 src={`https://image.tmdb.org/t/p/original${heroMovie.backdrop_path || heroMovie.poster_path}`}
@@ -300,15 +256,15 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* Next Page */}
-          {!searchQuery && hasMore && (
+          {/* Load More */}
+          {hasMore && (
             <div className="flex justify-end mb-12">
               <button
                 onClick={() => fetchMovies(false)}
                 disabled={isLoading}
                 className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-12 py-5 rounded-full font-black uppercase tracking-widest text-lg shadow-2xl transition"
               >
-                {isLoading ? "Loading..." : "Next Page"}
+                {isLoading ? "Loading..." : "More"}
               </button>
             </div>
           )}
