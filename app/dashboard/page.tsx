@@ -9,7 +9,8 @@ import { useWatchlist } from "@/context/WatchlistContext";
 import { useAuth } from "@/context/AuthContext";
 import { X, Star, Check, Plus, Menu } from "lucide-react";
 
-const BACKEND_URL = "https://watch-wave-5es6.onrender.com";
+// const BACKEND_URL = "https://watch-wave-5es6.onrender.com";
+const BACKEND_URL = 'https://api.themoviedb.org/3';
 
 export default function DashboardPage() {
   const { toggleWatchlist, toast, setToast, watchlist } = useWatchlist();
